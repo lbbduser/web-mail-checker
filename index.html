@@ -1,1 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Web Mail Checker</title>
+  <style>
+    * {box-sizing: border-box;font-family: 'Segoe UI', sans-serif;margin: 0;padding: 0;}
+    body {background: #f5f5f5;color: #333;}
+    .splash {
+      position: fixed;inset: 0;
+      background: linear-gradient(135deg, #4a90e2, #50e3c2);
+      color: white;font-size: 2.5rem;
+      display: flex;align-items: center;justify-content: center;
+      animation: fadeOut 2s ease forwards;animation-delay: 2.5s;
+      z-index: 9999;text-align: center;
+    }
+    @keyframes fadeOut {to {opacity: 0;visibility: hidden;}}
 
+    .container {
+      max-width: 800px;margin: 90px auto;padding: 30px;
+      background: white;border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;margin-bottom: 20px;
+      font-size: 2rem;color: #4a90e2;
+    }
+
+    textarea {
+      width: 100%;height: 260px;
+      padding: 14px;border-radius: 10px;
+      border: 1px solid #ccc;font-size: 16px;
+      background: #fefefe;
+      resize: vertical;
+    }
+
+    .extra-buttons {
+      display: flex;justify-content: flex-end;
+      gap: 10px;margin-top: 10px;
+    }
+
+    .extra-buttons button, .buttons button, .upload-label {
+      background: #4a90e2;color: white;
+      padding: 10px 20px;
+      border: none;border-radius: 8px;
+      font-size: 15px;font-weight: bold;
+      cursor: pointer;transition: 0.3s;
+    }
+
+    .buttons {
+      margin-top: 20px;
+      display: flex;gap: 12px;
+      justify-content: center;flex-wrap: wrap;
+    }
+
+    .upload-label input {display: none;}
+    .upload-label {background: #50e3c2;}
+
+    .counts {
+      margin-top: 12px;
+      font-size: 15px;
+      color: #666;
+      text-align: center;
+      user-select: none;
+    }
+
+    .popup, .alert-box {
+      position: fixed;inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;align-items: center;justify-content: center;
+      z-index: 10000;
+    }
+
+    .popup-content, .alert-content {
+      background: white;padding: 20px;
+      border-radius: 14px;
+      width: 90%;max-width: 500px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      display: flex;flex-direction: column;
+    }
+
+    .tabs {
+      display: flex;gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tabs button {
+      flex: 1;padding: 10px;
+      background: #eee;border: none;
+      border-radius: 6px;font-weight: bold;
+      cursor: pointer;
+    }
+
+    .tabs button.active {
+      background: #4a90e2;color: white;
+    }
+
+    .tab-section {
+      display: none;flex-direction: column;
+    }
+
+    .tab-section.active {display: flex;}
+
+    .tab-content {
+      overflow-y: auto;
+      max-height: 240px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+
+    ul {list-style: none;padding-left: 0;margin: 0;}
+    li {padding: 6px 0;border-bottom: 1px solid #eee;font-size: 14px;}
+
+    .popup-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .popup-buttons button {
+      background: #4a90e2;color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="splash">Web Mail Checker</div>
+
+<div class="container">
+  <h1>📧 Web Mail Filter Tool</h1>
+  <textarea id="dataInput" placeholder="Paste your data here..."></textarea>
+
+  <div class="extra-buttons">
+    <button onclick="clearTextarea()">🗑️ Clear</button>
+    <button onclick="copyTextarea()">📋 Copy</button>
+  </div>
+
+  <div class="buttons">
+    <button onclick="checkEmails()">Check</button>
+    <label class="upload-label">📁 Import File
+      <input type="file" id="fileInput" accept=".txt" onchange="handleFile(event)">
+    </label>
+  </div>
+
+  <div class="counts" id="countsDisplay">
+    <!-- Counts shown here -->
+  </div>
+</div>
+
+<!-- POPUP -->
+<div id="popup" class="popup" style="display:none;">
+  <div class="popup-content">
+    <div class="tabs">
+      <button class="active" onclick="showTab('tab1', event)">❌ No Webmail</button>
+      <button onclick="showTab('tab2', event)">⚠️ Duplicates</button>
+    </div>
+
+    <div id="tab1" class="tab-section active">
+      <div class="tab-content"><ul id="popupList"></ul></div>
+      <div class="popup-buttons">
+        <button onclick="removeNonWebMails()">Remove No Webmail</button>
+        <button onclick="copyPopupList('popupList')">Copy No Webmail</button>
+      </div>
+    </div>
+
+    <div id="tab2" class="tab-section">
+      <div class="tab-content"><ul id="dupeList"></ul></div>
+      <div class="popup-buttons">
+        <button onclick="removeDuplicates()">Remove Duplicates</button>
+        <button onclick="copyPopupList('dupeList')">Copy Duplicates</button>
+      </div>
+    </div>
+
+    <div class="popup-buttons" style="justify-content: flex-end;">
+      <button onclick="closePopup()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ALERT -->
+<div id="alertBox" class="alert-box" style="display:none;">
+  <div class="alert-content">
+    <h3 style="text-align:center;margin-bottom: 10px;">🔔 Notification</h3>
+    <p id="alertMessage" style="text-align:center;font-size: 16px;"></p>
+    <div class="popup-buttons" style="justify-content: center;">
+      <button onclick="closeAlert()">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const webMailDomains = [
+    '@phuongfb.com','@dqmail.org','@47bmt.com','@thueotp.net','@email-very.com',
+    '@theanseladams.com','@setxko.com','@modujoa.com','@shopmmovn.com',
+    '@peakwaveway.com','@acctw.net','@healthsoulger.com','@jibbo01.com',
+    '@tradepopclick.com','@genjosam.com','@mailto.plus','@fexpost.com',
+    '@fexbox.org','@mailbox.in.ua','@rover.info','@chitthi.in','@fextemp.com',
+    '@any.pink','@merepost.com','@end.tw','@qabq.com','@nqmo.com','@uuf.me','@6n9.net'
+  ];
+
+  const webMailKeywords = [
+    '5smail.Email','5scode.Email','5smail.io.Vn','fviainboxes.com',
+    'fviadropinbox.com','fviamail.work','dropinboxes.com'
+  ];
+
+  let nonWebMailLines = [], duplicateLines = [];
+
+  function extractEmail(line) {
+    const match = line.match(/[a-zA-Z0-9._%+-]+@[\w.-]+/);
+    return match ? match[0] : null;
+  }
+
+  function getDomain(email) {
+    return email ? '@' + email.split('@')[1].toLowerCase() : null;
+  }
+
+  function getFirstSegment(line) {
+    return line.includes('|') ? line.split('|')[0].trim().toLowerCase() : line.trim().toLowerCase();
+  }
+
+  function isWebMail(email) {
+    if (!email) return false;
+    const domain = getDomain(email);
+    const fullEmail = email.toLowerCase();
+    return (domain && webMailDomains.includes(domain)) || webMailKeywords.some(k => fullEmail.includes(k.toLowerCase()));
+  }
+
+  function checkEmails() {
+    const input = document.getElementById('dataInput');
+    const lines = input.value.split('\n').map(l => l.trim()).filter(l => l);
+
+    if (lines.length === 0) return showAlert("Please enter some data!");
+
+    const seen = new Set();
+    nonWebMailLines = [];
+    duplicateLines = [];
+
+    // Detect non web mail and duplicates
+    for (let line of lines) {
+      const email = extractEmail(line);
+      if (!isWebMail(email)) nonWebMailLines.push(line);
+
+      const segment = getFirstSegment(line);
+      if (seen.has(segment)) duplicateLines.push(line);
+      else seen.add(segment);
+    }
+
+    // Show counts
+    document.getElementById('countsDisplay').textContent = 
+      `Detected: ${nonWebMailLines.length} No Webmail, ${duplicateLines.length} Duplicates`;
+
+    if (nonWebMailLines.length === 0 && duplicateLines.length === 0)
+      return showAlert("✅ All data is valid (webmail + no duplicates).");
+
+    renderPopupLists();
+    document.getElementById('popup').style.display = 'flex';
+  }
+
+  function renderPopupLists() {
+    document.getElementById('popupList').innerHTML = nonWebMailLines.map(l => `<li>${l}</li>`).join('');
+    document.getElementById('dupeList').innerHTML = duplicateLines.map(l => `<li>${l}</li>`).join('');
+  }
+
+  function removeDuplicates() {
+    const input = document.getElementById('dataInput');
+    const lines = input.value.split('\n').map(l => l.trim()).filter(l => l);
+
+    const groups = new Map();
+
+    lines.forEach(line => {
+      const key = getFirstSegment(line);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(line);
+    });
+
+    const newLines = [];
+
+    groups.forEach((groupLines, key) => {
+      const email = extractEmail(groupLines[0]);
+      if (isWebMail(email)) {
+        // Keep exactly one if web mail
+        newLines.push(groupLines[0]);
+      }
+      // else (not web mail) skip all duplicates of this group
+    });
+
+    input.value = newLines.join('\n');
+    duplicateLines = [];
+    renderPopupLists();
+    document.getElementById('countsDisplay').textContent = 
+      `Detected: ${nonWebMailLines.length} No Webmail, ${duplicateLines.length} Duplicates`;
+  }
+
+  function removeNonWebMails() {
+    const input = document.getElementById('dataInput');
+    const lines = input.value.split('\n').map(l => l.trim()).filter(l => l);
+    input.value = lines.filter(line => !nonWebMailLines.includes(line)).join('\n');
+    nonWebMailLines = [];
+    renderPopupLists();
+    document.getElementById('countsDisplay').textContent = 
+      `Detected: ${nonWebMailLines.length} No Webmail, ${duplicateLines.length} Duplicates`;
+  }
+
+  function closePopup() {
+    document.getElementById('popup').style.display = 'none';
+  }
+
+  function showTab(id, event) {
+    document.querySelectorAll('.tab-section').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tabs button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function handleFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('dataInput').value += '\n' + e.target.result.trim();
+    };
+    reader.readAsText(file);
+  }
+
+  function showAlert(msg) {
+    document.getElementById('alertMessage').textContent = msg;
+    document.getElementById('alertBox').style.display = 'flex';
+  }
+
+  function closeAlert() {
+    document.getElementById('alertBox').style.display = 'none';
+  }
+
+  function clearTextarea() {
+    document.getElementById('dataInput').value = '';
+    document.getElementById('countsDisplay').textContent = '';
+  }
+
+  // Fallback copy method (execCommand)
+  function fallbackCopyTextToClipboard(text) {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+
+    textArea.style.position = "fixed";
+    textArea.style.top = 0;
+    textArea.style.left = 0;
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = 0;
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      var successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      document.body.removeChild(textArea);
+      return false;
+    }
+  }
+
+  function copyTextToClipboard(text) {
+    if (!navigator.clipboard) {
+      const success = fallbackCopyTextToClipboard(text);
+      if(success) {
+        showAlert("✅ Copied to clipboard!");
+      } else {
+        showAlert("❌ Copy failed!");
+      }
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      showAlert("✅ Copied to clipboard!");
+    }).catch(() => {
+      const success = fallbackCopyTextToClipboard(text);
+      if(success) {
+        showAlert("✅ Copied to clipboard!");
+      } else {
+        showAlert("❌ Copy failed!");
+      }
+    });
+  }
+
+  function copyTextarea() {
+    const textarea = document.getElementById('dataInput');
+    copyTextToClipboard(textarea.value);
+  }
+
+  function copyPopupList(ulId) {
+    const ul = document.getElementById(ulId);
+    if (!ul) return showAlert("Nothing to copy!");
+
+    const lines = Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim()).filter(Boolean);
+    if (lines.length === 0) return showAlert("Nothing to copy!");
+
+    const text = lines.join('\n');
+    copyTextToClipboard(text);
+  }
+</script>
+
+</body>
+</html>
